@@ -1,0 +1,18 @@
+<form class="form-horizontal">
+  <div class="control-group">
+      <label class="control-label">{{ _('GPIO Pin') }}</label>
+      <div class="controls">
+        <input type="number"
+               class="input-block-level"
+               data-bind="value: settings.plugins.pi_cpu_fan.gpio_pin">
+      </div>
+  </div>
+  <div class="control-group">
+      <label class="control-label">{{ _('Update Period (Secs)') }}</label>
+      <div class="controls">
+        <input type="number"
+               class="input-block-level"
+               data-bind="value: settings.plugins.pi_cpu_fan.update_period_secs">
+      </div>
+  </div>
+</form>
