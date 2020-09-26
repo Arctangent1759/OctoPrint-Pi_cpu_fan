@@ -30,7 +30,7 @@ class AdaptiveFan():
         try:
             return float(self.TEMP_RE.match(os.popen("vcgencmd measure_temp").readline()).group(1))
         except Exception as e:
-            print(e)
+            self._logger.info(str(e))
             return None
 
     def GetPower(self):
@@ -39,13 +39,20 @@ class AdaptiveFan():
     def UpdateFan(self):
         temperature = self.GetTemperature()
         if temperature is None:
-            print("Failed to get temperature.")
+            self._logger.info("Failed to get temperature.")
             return
         for temperature_range_config in self.temperature_config:
             min_temperature, max_temperature, min_power, max_power = temperature_range_config
             if (min_temperature is None or temperature >= min_temperature) and (max_temperature is None or temperature < max_temperature):
-                scale = (temperature - min_temperature) / (max_temperature - min_temperature)
-                fan_power = min_power + scale * (max_power - min_power)
+                if min_temperature is not None and max_temperature is not None:
+                    scale = (temperature - min_temperature) / (max_temperature - min_temperature)
+                    fan_power = min_power + scale * (max_power - min_power)
+                elif min_temperature is None:
+                    fan_power = min_power
+                elif max_temperature is None:
+                    fan_power = max_power
+                else:
+                    fan_power = max_power
         self._SetFan(fan_power)
 
     def Stop(self):
@@ -65,9 +72,10 @@ class PiCpuFanPlugin(octoprint.plugin.StartupPlugin,
                      octoprint.plugin.SettingsPlugin,
                      octoprint.plugin.ShutdownPlugin):
     def on_after_startup(self):
+        self._logger.info("PiCpuFanPlugin: on_after_startup")
         gpio_pin = int(self._settings.get(['gpio_pin']))
         if gpio_pin == -1:
-            print("GPIO Not configured. Giving up.")
+            self._logger.info("GPIO Not configured. Giving up.")
             return
         update_period_secs = float(self._settings.get(['update_period_secs']))
         self.fan = AdaptiveFan(gpio_pin, [
@@ -77,14 +85,18 @@ class PiCpuFanPlugin(octoprint.plugin.StartupPlugin,
             (55.0, None, 1.0, 1.0),
         ])
         def FanLoop():
+            print("PiCpuFanPlugin: Start fan.")
             self.fan.Start()
+            print("PiCpuFanPlugin: Fan started.")
             try:
+                print("PiCpuFanPlugin: Start loop.")
                 while True:
+                    print("Updating...")
                     self.fan.UpdateFan()
                     print("CPU Temperature is {0}'C. Setting fan power to {1}.".format(self.fan.GetTemperature(), self.fan.GetPower()))
                     time.sleep(update_period_secs)
             except Exception as e:
-                print(e)
+                print(str(e))
             finally:
                 self.fan.Stop()
         self.fan_thread = multiprocessing.Process(target=FanLoop)
